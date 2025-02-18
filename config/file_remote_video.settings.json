@@ -1,0 +1,36 @@
+{
+  "_config_name": "file_remote_video.settings",
+  "youtube": {
+    "width": 640,
+    "height": 390,
+    "autohide": 2,
+    "autoplay": false,
+    "color": "red",
+    "enablejsapi": false,
+    "loop": false,
+    "modestbranding": false,
+    "nocookie": false,
+    "origin": "",
+    "protocol": "https:",
+    "protocol_specify": false,
+    "rel": false,
+    "showinfo": true,
+    "theme": "dark",
+    "captions": "0",
+    "controls": "0"
+  },
+  "vimeo":  {
+    "width": 640,
+    "height": 360,
+    "preview_uri": "vimeo://v/21869117",
+    "api": "0",
+    "autoplay": "0",
+    "byline": "1",
+    "color": null,
+    "loop": "0",
+    "portrait": "1",
+    "title": "1",
+    "protocol": "https://",
+    "protocol_specify": false
+  }
+}

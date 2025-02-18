@@ -1,0 +1,4 @@
+name = File Remote Video
+description = Provides a file stream wrappers for YouTube and Vimeo
+backdrop = 1.x
+type = module

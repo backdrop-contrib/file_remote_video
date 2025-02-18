@@ -1,0 +1,34 @@
+.file-remote-video-widget-filename {
+  margin-bottom: 10px;
+}
+.view-file-remote-video-library .view-content {
+  display: flex;
+  flex-wrap: wrap;
+}
+.view-file-remote-video-library .views-row {
+  --flex-items: 4;
+  --flex-gap: 20px;
+  width: calc((100% / var(--flex-items)) - (((var(--flex-items) - 1) / var(--flex-items)) * var(--flex-gap)));
+}
+.file-remote-video-browser-views-link {
+  display: block;
+  border: 2px solid #fff;
+}
+.file-remote-video-browser-views-link.is-selected {
+  border: 2px solid black;
+}
+.file-remote-video-browser-icon {
+  display: block;
+}
+.file-remote-video-browser-icon img {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+.file-remote-video-browser-filename {
+  display: block;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

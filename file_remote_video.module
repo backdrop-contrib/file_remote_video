@@ -1,0 +1,176 @@
+<?php
+
+require_once dirname(__FILE__) . '/includes/file_remote_video.formatters.inc';
+require_once dirname(__FILE__) . '/includes/file_remote_video.widget.inc';
+
+function file_remote_video_autoload_info() {
+  return [
+    'FileYouTubeStreamWrapper' => 'includes/FileYouTubeStreamWrapper.php',
+    'FileVimeoStreamWrapper' => 'includes/FileVimeoStreamWrapper.php',
+    'MediaReadOnlyStreamWrapper' => 'includes/MediaReadOnlyStreamWrapper.php',
+    'MediaReadOnlyStreamWrapper' => 'includes/MediaReadOnlyStreamWrapper.php',
+    'FileRemoteVideoBaseHandler' => 'includes/FileRemoteVideoBaseHandler.inc',
+    'FileRemoteVideoYouTubeHandler' => 'includes/FileRemoteVideoYouTubeHandler.inc',
+    'FileRemoteVideoVimeoHandler' => 'includes/FileRemoteVideoVimeoHandler.inc',
+  ];
+}
+
+/**
+ * Implements hook_config_info().
+ */
+function file_remote_video_config_info() {
+  $prefixes['file_remote_video.settings'] = [
+    'label' => t('File Remote Video Settings'),
+    'group' => t('Configuration'),
+  ];
+  return $prefixes;
+}
+
+/**
+ * Implements hook_menu().
+ */
+function file_remote_video_menu() {
+  return [
+    'admin/config/media/file-remote-video-settings' => [
+      'title' => t('Global Remote Video Settings'),
+      'page callback' => 'backdrop_get_form',
+      'page arguments' => ['file_remote_video_settings_form'],
+      'access arguments' => ['administer file types'],
+    ],
+  ];
+}
+
+/**
+ * Implements hook_stream_wrappers().
+ */
+function file_remote_video_stream_wrappers() {
+  $stream_wrappers = [
+    'youtube' => [
+      'name' => t('YouTube Video'),
+      'class' => 'FileYouTubeStreamWrapper',
+      'description' => 'Provides a YouTube wrapper for Backdrop core files',
+      'type' => STREAM_WRAPPERS_READ_VISIBLE
+    ],
+    'vimeo' => [
+      'name' => t('Vimeo Video'),
+      'class' => 'FileVimeoStreamWrapper',
+      'description' => 'Provides a Vimeo wrapper for Backdrop core files',
+      'type' => STREAM_WRAPPERS_READ_VISIBLE
+    ]
+  ];
+  return $stream_wrappers;
+}
+
+/**
+ * Implements hook_remote_video_handlers().
+ */
+function file_remote_video_remote_video_handlers() {
+  $handlers = [
+    'vimeo' => [
+      'class' => 'FileRemoteVideoVimeoHandler',
+    ],
+  ];
+  return $handlers;
+}
+
+function file_remote_video_get_remote_video_handlers() {
+  $handlers = [];
+  foreach (module_implements('remote_video_handlers') as $module) {
+    $handlers = array_merge($handlers, module_invoke($module, 'remote_video_handlers'));
+  }
+  return $handlers;
+}
+
+/**
+ * Implements hook_theme().
+ */
+function file_remote_video_theme($existing, $type, $theme, $path) {
+  return array(
+    'file_remote_video_widget' => [
+      'file' => 'file_remote_video.theme.inc',
+      'render element' => 'element',
+    ],
+    'file_remote_video_youtube' => array(
+      'variables' => array('uri' => NULL, 'options' => array()),
+      'file' => 'file_remote_video.theme.inc',
+      'path' => $path . '/themes',
+      'template' => 'file-remote-video-youtube',
+    ),
+    'file_remote_video_vimeo' => array(
+      'variables' => array('uri' => NULL, 'options' => array()),
+      'file' => 'file_remote_video.theme.inc',
+      'path' => $path . '/themes',
+      'template' => 'file-remote-video-vimeo',
+    ),
+  );
+}
+
+function file_remote_video_settings_form($form, &$form_state) {
+  $config = config('file_remote_video.settings');
+  $settings = $config->getData();
+  $youtube_fieldset = file_remote_video_field_formatter_settings_form_youtube_fieldset($settings['youtube']);
+  $form['youtube'] = $youtube_fieldset['youtube'];
+  $vimeo_fieldset = file_remote_video_field_formatter_settings_form_vimeo_fieldset($settings['vimeo']);
+  $form['vimeo'] = $vimeo_fieldset['vimeo'];
+  $form['submit'] = [
+    '#type' => 'submit',
+    '#value' => t('Save Player Config'),
+  ];
+
+  return $form;
+}
+
+function file_remote_video_settings_form_submit($form, &$form_state) {
+  $config = config('file_remote_video.settings');
+  $config_settings = $config->getData();
+  $form_values = array_merge($config_settings, $form_state['values']);
+  $settings = [
+    'youtube' => $form_values['youtube'],
+    'vimeo' => $form_values['vimeo'],
+  ];
+  $config->setData($settings);
+  $config->save();
+  backdrop_set_message(t('Configuration saved!'));
+}
+
+function file_remote_video_views_post_render(&$view, &$output, &$cache) {
+  if ($view->name == 'file_remote_video_library') {
+    $icon_path = backdrop_get_path('module', 'file_remote_video') . '/images/icon-video.svg';
+    $icon = theme('image', [
+      'path' => $icon_path,
+      'width' => 100,
+      'height' => 100,
+      'alt' => t('Video Icon'),
+    ]);
+    foreach ($view->result as $result) {
+      $placeholder = "--icon-{$result->fid}--";
+      $output = str_replace($placeholder, $icon, $output);
+    }
+  }
+}
+
+/**
+ * Returns a file object which can be saved.
+ *
+ * @param string $uri
+ *   A string containing the URI, path, or filename.
+ * @return object|bool
+ *   A file object, or FALSE on error.
+ *
+ */
+function file_remote_video_load_or_create_video_by_uri($uri) {
+  $files = file_load_multiple([], ['uri' => $uri]);
+  $file = !empty($files) ? reset($files) : FALSE;
+  if (empty($file)) {
+    global $user;
+    $values = [
+      'uid' => $user->uid,
+      'status' => FILE_STATUS_PERMANENT,
+      'uri' => $uri,
+      'mimetype' => file_get_mimetype($uri),
+      'timestamp' => REQUEST_TIME,
+    ];
+    $file = new File($values);
+  }
+  return $file;
+}
