@@ -69,6 +69,9 @@ function file_remote_video_remote_video_handlers() {
     'vimeo' => [
       'class' => 'FileRemoteVideoVimeoHandler',
     ],
+    'youtube' => [
+      'class' => 'FileRemoteVideoYouTubeHandler',
+    ],
   ];
   return $handlers;
 }

@@ -41,6 +41,11 @@ abstract class FileRemoteVideoBaseHandler {
   abstract public function getFileObject();
 
   /**
+   * Returns information about the video
+   */
+  abstract public function getFileInfo();
+
+  /**
    * If required, implementors can validate the embedCode.
    */
   public function validate() {
