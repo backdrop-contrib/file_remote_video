@@ -303,8 +303,8 @@ function file_remote_video_ajax_form_video_browser_dialog($form, &$form_state) {
   $html = '';
   $html .= theme('status_messages');
   $html .= '<div class="file-remote-video-browser">';
-  $html .= '<div class="tabs">';
-  $html .= '<ul class="tabs primary">';
+  $html .= '<div class="file-remote-videos-tabs-wrapper">';
+  $html .= '<ul class="file-remote-video-tabs">';
   $html .= '<li class="tab"><a href="#" data-op="add" data-selector="#file-remote-video-form-wrapper">' . t('Add Video') . '</a>';
   $html .= '<li class="tab"><a href="#" data-op="insert" data-selector=".file-remote-video-browser-view">' . t('Browse video library') . '</a>';
   $html .= '</ul>';

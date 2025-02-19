@@ -32,3 +32,63 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/*Video Browser Tabs*/
+.file-remote-video-tabs {
+  clear: both;
+  box-sizing: border-box;
+  border: none;
+  width: 100%;
+  float: left;
+  margin: 0;
+  padding: 0;
+  font-size: 0.9375em;
+  text-transform: uppercase;
+}
+.file-remote-video-tabs li {
+  float: left;
+  margin: 0 0;
+  border-right: 2px solid #f0f0f0;
+  list-style: none;
+}
+[dir="rtl"] .file-remote-video-tabs li {
+  float: right;
+  border-left: 2px solid #f0f0f0;
+  border-right: 0;
+}
+.file-remote-video-tabs li a,
+.file-remote-video-tabs li a.active,
+.file-remote-video-tabs li a:active,
+.file-remote-video-tabs li a:visited,
+.file-remote-video-tabs li a:hover,
+.file-remote-video-tabs li.active a {
+  display: block;
+  padding: 12px 20px;
+  border: none;
+  overflow: visible;
+  line-height: 1;
+  color: #606060;
+  font-weight: normal;
+  background-color: #DBDBD9;
+  transition:
+    background-color 0.5s ease 0s,
+    color 0.5s ease 0s;
+  will-change: background-color, color;
+}
+.file-remote-video-tabs li.active a,
+.file-remote-video-tabs li.active a.active,
+.file-remote-video-tabs li.active a:active,
+.file-remote-video-tabs li.active a:visited {
+  color: #000;
+  background-color: #fafafa;
+  font-weight: bold;
+}
+.file-remote-video-tabs li a:hover {
+  color: #000;
+  background: #c5c5c3;
+}
+.file-remote-video-tabs li:first-child a {
+  border-radius: 4px 0 0 0;
+}
+.file-remote-video-tabs li:last-child a {
+  border-radius: 0 4px 0 0;
+}

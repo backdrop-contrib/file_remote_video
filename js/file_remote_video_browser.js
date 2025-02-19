@@ -15,7 +15,7 @@
           fidInput.val($(this).data('fid'));
           return false;
         });
-        let tabs = browser.find('.tabs');
+        let tabs = browser.find('.file-remote-video-tabs');
         let tabItems = tabs.find('li');
         let tabLinks = tabItems.find('a');
         tabItems.find('a').once().on('click', function(e) {
@@ -41,8 +41,8 @@
 
   Backdrop.fileRemoteVideo = {
     dialogCloseEvent: function(e, dialog, element) {
-      if (element.attr('id') == 'file-remote-video-browser-modal')  {
-        const browser = Backdrop.settings.fileRemoteVideoBrowser;
+      const browser = Backdrop.settings.fileRemoteVideoBrowser;
+      if (element.attr('id') == 'file-remote-video-browser-modal' && browser.selectedFid)  {
         let fidElement = $(`input[name="${browser.fidElement}"]`);
         fidElement.val(browser.selectedFid);
         $(`input[name="${browser.refreshButton}"]`).trigger('mousedown').trigger('mouseup').trigger('click');
