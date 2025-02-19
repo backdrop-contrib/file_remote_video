@@ -10,7 +10,7 @@
         links.once().on('click', function(e) {
           e.preventDefault();
           fidInput.val('');
-          links.find('.is-selected').removeClass('is-selected');
+          links.filter('.is-selected').removeClass('is-selected');
           $(this).addClass('is-selected');
           fidInput.val($(this).data('fid'));
           return false;
@@ -42,10 +42,10 @@
   Backdrop.fileRemoteVideo = {
     dialogCloseEvent: function(e, dialog, element) {
       if (element.attr('id') == 'file-remote-video-browser-modal')  {
-        let selectedFid = Backdrop.settings.fileRemoteVideoBrowser.selectedFid;
-        let fidElement = $(`input[name="${Backdrop.settings.fileRemoteVideoBrowser.currentFidElement}"]`);
-        console.log(fidElement);
-        fidElement.val(selectedFid).trigger('change');
+        const browser = Backdrop.settings.fileRemoteVideoBrowser;
+        let fidElement = $(`input[name="${browser.fidElement}"]`);
+        fidElement.val(browser.selectedFid);
+        $(`input[name="${browser.refreshButton}"]`).trigger('mousedown').trigger('mouseup').trigger('click');
       }
     }
   };

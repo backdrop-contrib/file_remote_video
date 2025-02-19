@@ -59,30 +59,56 @@ function file_remote_video_field_widget_form(&$form, &$form_state, $field, $inst
   // Load the items for form rebuilds from the field state as they might not be
   // in $form_state['values'] because of validation limitations. Also, they are
   // only passed in as $items when editing existing entities.
+  // $field_state['items'] is added by file_remote_video_widget_submit
   $field_state = field_form_get_state($element['#field_parents'], $field['field_name'], $langcode, $form_state);
+  $field_state_exists = isset($field_state['items']) ? 'true' : 'false';
   if (isset($field_state['items'])) {
     $items = $field_state['items'];
   }
+  $elements = [
+    '#type' => 'fieldset',
+    '#process' => ['file_remote_video_widget_wrapper_process'],
+  ];
 
   $element_info = element_info('remote_video_widget');
   $element += [
     '#type' => 'remote_video_widget',
     '#field_label' => $instance['label'],
   ];
-  if ($instance['required']) {
-    $element['#required'] = TRUE;
-  }
   if ($field['cardinality'] == 1) {
     // Set the default value.
     $element['#default_value'] = !empty($items) ? $items[0] : $defaults;
-    $elements = [$element];
+    if ($instance['required']) {
+      $element['#required'] = TRUE;
+    }
+    $elements[] = $element;
   }
   else {
-    // handle multiple values here
+    foreach ($items as $key => $item) {
+      $elements[$delta] = $element;
+      $elements[$delta]['#default_value'] = $item;
+      $elements[$delta]['#required'] = ($instance['required'] && $delta == 0);
+      $elements[$delta]['#delta'] = $delta;
+      $delta++;
+    }
+    // And then add one more empty row for new uploads except when this is a
+    // programmed form as it is not necessary.
+    if (($field['cardinality'] == FIELD_CARDINALITY_UNLIMITED || $delta < $field['cardinality']) && empty($form_state['programmed'])) {
+      $elements[$delta] = $element;
+      $elements[$delta]['#default_value'] = $defaults;
+      $elements[$delta]['#required'] = ($instance['required'] && $delta == 0);
+      $elements[$delta]['#delta'] = $delta;
+    }
   }
 
-
   return $elements;
+}
+
+function file_remote_video_widget_wrapper_process($element, &$form_state, $form) {
+  // Prefix and suffix used for Ajax replacement.
+  $element['#prefix'] = '<div id="' . $element['#id'] . '-ajax-wrapper">';
+  $element['#suffix'] = '</div>';
+  return $element;
 }
 
 /**
@@ -98,35 +124,40 @@ function file_remote_video_widget_process($element, &$form_state, $form) {
   if (isset($element['#value']['fid'])) {
     $fid = $element['#value']['fid'];
   }
-  $parents = $element['#field_parents'];
+
+  $parents = array_slice($element['#array_parents'], 0, -1);
   $field_element = backdrop_array_get_nested_value($form, $parents);
   $ajax_wrapper = $field_element['#id'] . '-ajax-wrapper';
-  $element['#prefix'] = "<div id=\"$ajax_wrapper\">";
-  $element['#suffix'] = "</div>";
+
   $element['#file'] = $fid ? file_load($fid) : FALSE;
   $element['#tree'] = TRUE;
-  // Ajax commands don't work on hidden elements so
-  // we have to use a hidden text field
   $element['fid'] = [
-    '#type' => 'textfield',
+    '#type' => 'hidden',
     '#tree' => TRUE,
-    '#ajax' => [
-      'callback' => 'file_remote_video_ajax_form_update_file',
-      'wrapper' => $ajax_wrapper,
-      'event' => 'change',
-    ],
     '#default_value' => $fid,
-    '#attributes' => ['style' => 'display: none;'],
   ];
   $element['add'] = [
     '#name' => implode('_', $element['#parents']) . '_add',
     '#type' => 'submit',
-    '#value' => t('Add a Video'),
+    '#value' => t('Add'),
     '#submit' => [],
-    '#limit_validation_errors' => [$element['#parents']],
+    '#limit_validation_errors' => [array_slice($element['#parents'], 0, -1)],
     '#ajax' => [
-      'callback' => 'file_remote_video_ajax_form_add_file_dialog',
+      'callback' => 'file_remote_video_ajax_form_video_browser_dialog',
     ],
+  ];
+  // This element is triggered automatically when the file browser dialog closes
+  $element['refresh'] = [
+    '#name' => implode('_', $element['#parents']) . '_refresh',
+    '#type' => 'submit',
+    '#value' => t('Refresh'),
+    '#submit' => ['file_remote_video_widget_submit'],
+    '#limit_validation_errors' => [array_slice($element['#parents'], 0, -1)],
+    '#ajax' => [
+      'callback' => 'file_remote_video_ajax_form_update_file',
+      'wrapper' => $ajax_wrapper
+    ],
+    '#attributes' => ['style' => 'display: none;'],
   ];
   if (!empty($fid)) {
     $element['add']['#value'] = t('Replace Video');
@@ -136,7 +167,7 @@ function file_remote_video_widget_process($element, &$form_state, $form) {
       '#value' => t('Remove'),
       '#validate' => [],
       '#submit' => ['file_remote_video_widget_submit'],
-      '#limit_validation_errors' => [$element['#parents']],
+      '#limit_validation_errors' => [array_slice($element['#parents'], 0, -1)],
       '#ajax' => [
         'callback' => 'file_remote_video_ajax_form_update_file',
         'wrapper' => $ajax_wrapper
@@ -169,8 +200,53 @@ function file_remote_video_widget_submit($form, &$form_state) {
   if ($button_key == 'remove') {
     form_set_value($element['fid'], NULL, $form_state);
     backdrop_array_set_nested_value($form_state['input'], $element['fid']['#parents'], NULL);
-    $form_state['rebuild'] = TRUE;
   }
+
+  // Set the form to rebuild so that $form is correctly updated in response to
+  // processing the file removal. Since this function did not change $form_state
+  // if the upload button was clicked, a rebuild isn't necessary in that
+  // situation and setting $form_state['redirect'] to FALSE would suffice.
+  // However, we choose to always rebuild, to keep the form processing workflow
+  // consistent between the two buttons.
+  $form_state['rebuild'] = TRUE;
+
+  // The following was cribbed directly from file_field_widget_submit
+  // This sets $field_state['items'] so we can use them in
+  // file_remote_video_widget_form()
+  // During the form rebuild, file_remote_video_widget_form() will create field item
+  // widget elements using re-indexed deltas, so clear out $form_state['input']
+  // to avoid a mismatch between old and new deltas. The rebuilt elements will
+  // have #default_value set appropriately for the current state of the field,
+  // so nothing is lost in doing this.
+  $parents = array_slice($form_state['triggering_element']['#parents'], 0, -2);
+  backdrop_array_set_nested_value($form_state['input'], $parents, NULL);
+
+  $button = $form_state['triggering_element'];
+
+  // Go one level up in the form, to the widgets container.
+  $element = backdrop_array_get_nested_value($form, array_slice($button['#array_parents'], 0, -1));
+  $field_name = $element['#field_name'];
+  $langcode = $element['#language'];
+  $parents = $element['#field_parents'];
+
+  $submitted_values = backdrop_array_get_nested_value($form_state['values'], array_slice($button['#parents'], 0, -2));
+  foreach ($submitted_values as $delta => $submitted_value) {
+    if (!$submitted_value['fid']) {
+      unset($submitted_values[$delta]);
+    }
+  }
+
+  // Re-index deltas after removing empty items.
+  $submitted_values = array_values($submitted_values);
+
+  // Update form_state values.
+  backdrop_array_set_nested_value($form_state['values'], array_slice($button['#parents'], 0, -2), $submitted_values);
+
+  // Update items.
+  $field_state = field_form_get_state($parents, $field_name, $langcode, $form_state);
+  $field_state['items'] = $submitted_values;
+
+  field_form_set_state($parents, $field_name, $langcode, $form_state, $field_state);
 }
 
 function file_remote_video_widget_value(&$element, $input = FALSE, $form_state = NULL) {
@@ -204,13 +280,13 @@ function file_remote_video_widget_value(&$element, $input = FALSE, $form_state =
 }
 
 function file_remote_video_ajax_form_update_file($form, &$form_state) {
-  $parents = $form_state['triggering_element']['#array_parents'];
-  array_pop($parents);
+  // Go up two levels to get the widget wrapping element
+  $parents = array_slice($form_state['triggering_element']['#parents'], 0, -2);
   $element = backdrop_array_get_nested_value($form, $parents);
   return $element;
 }
 
-function file_remote_video_ajax_form_add_file_dialog($form, &$form_state) {
+function file_remote_video_ajax_form_video_browser_dialog($form, &$form_state) {
   $parents = $form_state['triggering_element']['#array_parents'];
   array_pop($parents);
   $element = backdrop_array_get_nested_value($form, $parents);
@@ -242,7 +318,8 @@ function file_remote_video_ajax_form_add_file_dialog($form, &$form_state) {
   $settings = [
     'fileRemoteVideoBrowser' => [
       'selectedFid' => NULL,
-      'currentFidElement' => '[name="' . $element['fid']['#name'] . '"]',
+      'fidElement' => $element['fid']['#name'],
+      'refreshButton' => $element['refresh']['#name'],
     ],
   ];
 
