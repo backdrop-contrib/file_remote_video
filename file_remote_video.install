@@ -1,0 +1,28 @@
+<?php
+
+/**
+ * Implements hook_install().
+ */
+function file_remote_video_install() {
+  $view_config = config('views.view.file_remote_video_library');
+  if ($view_config->isNew()) {
+    $path = backdrop_get_path('module', 'file_remote_video') . '/config/';
+    $contents = file_get_contents($path . 'views.view.file_remote_video_library');
+    $data = json_decode($contents, true);
+    $view_config->setData($data);
+    $view_config->save();
+  }
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function file_remote_video_uninstall() {
+  $names = ['views.view.file_remote_video'];
+  foreach ($names as $config_name) {
+    $config = config($config_name);
+    $config->delete();
+  }
+  // Clear admin bar cache to remove views from menu
+  cache('admin_bar')->flush();
+}
