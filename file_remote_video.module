@@ -177,14 +177,13 @@ function file_remote_video_fetch_file_metadata($file) {
 }
 
 function file_remote_video_file_is_remote_video($file) {
-  $remote_stream_wrappers = file_remote_video_stream_wrappers();
-  $stream_wrapper_classes = [];
-  foreach ($remote_stream_wrappers as $wrapper) {
-   $stream_wrapper_classes[] = $wrapper['class'];
+  $stream_wrappers = file_remote_video_stream_wrappers();
+  $types = array_keys($stream_wrappers);
+  $mimes = [];
+  foreach ($types as $type) {
+    $mimes[] = "video/{$type}";
   }
-  $stream_wrapper = file_stream_wrapper_get_instance_by_uri($file->uri);
-  $stream_wrapper_class = get_class($stream_wrapper);
-  return in_array($stream_wrapper_class, $stream_wrapper_classes);
+  return in_array($file->filemime, $mimes);
 }
 
 /**

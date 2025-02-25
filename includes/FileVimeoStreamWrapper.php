@@ -11,6 +11,7 @@
  */
 class FileVimeoStreamWrapper extends MediaReadOnlyStreamWrapper {
   protected $base_url = 'https://vimeo.com';
+  public $oembed;
 
   static function getMimeType($uri, $mapping = NULL) {
     return 'video/vimeo';
