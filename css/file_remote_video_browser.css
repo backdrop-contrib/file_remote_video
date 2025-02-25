@@ -1,6 +1,13 @@
 .file-remote-video-widget-filename {
   margin-bottom: 10px;
 }
+.file-remote-video-widget-thumbnail {
+  max-width: 150px;
+}
+.file-remote-video-widget-thumbnail img {
+  max-width: 100%;
+  height: auto;
+}
 .view-file-remote-video-library .view-content {
   display: flex;
   flex-wrap: wrap;
@@ -17,13 +24,15 @@
 .file-remote-video-browser-views-link.is-selected {
   border: 2px solid black;
 }
-.file-remote-video-browser-icon {
+.file-remote-video-browser-thumbnail {
   display: block;
 }
-.file-remote-video-browser-icon img {
+.file-remote-video-browser-thumbnail img {
   display: block;
   margin-left: auto;
   margin-right: auto;
+  max-width: 100%;
+  height: auto;
 }
 .file-remote-video-browser-filename {
   display: block;

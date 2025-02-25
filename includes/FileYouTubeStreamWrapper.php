@@ -2,9 +2,28 @@
 
 class FileYouTubeStreamWrapper extends MediaReadOnlyStreamWrapper {
   protected $base_url = 'https://www.youtube.com/watch';
+  public $oembed;
 
   static function getMimeType($uri, $mapping = NULL) {
     return 'video/youtube';
+  }
+
+  function getOEmbed() {
+    if (!isset($this->oembed)) {
+      $parts = $this->get_parameters();
+      $uri = file_stream_wrapper_uri_normalize('youtube://v/' . check_plain($parts['v']));
+      $external_url = file_create_url($uri);
+      $oembed_url = url('https://www.youtube.com/oembed', array('query' => array('url' => $external_url, 'format' => 'json')));
+      $response = drupal_http_request($oembed_url);
+      if (!isset($response->error)) {
+        $this->oembed = drupal_json_decode($response->data);
+      }
+      else {
+        throw new Exception("Error Processing Request. (Error: {$response->code}, {$response->error})");
+        return;
+      }
+    }
+    return $this->oembed;
   }
 
   function getOriginalThumbnailPath() {
@@ -19,31 +38,20 @@ class FileYouTubeStreamWrapper extends MediaReadOnlyStreamWrapper {
       return $thumbnail_url;
     }
     elseif ($response->code == -110) {
-      throw new MediaInternetValidationException("Connection timed out.");
+      throw new Exception("Connection timed out.");
     }
     elseif ($response->code == 401) {
-      throw new MediaInternetValidationException("Embedding has been disabled for this video.");
+      throw new Exception("Embedding has been disabled for this video.");
     }
     elseif ($response->code == 404) {
       return "https://s.ytimg.com/yts/img/image-hh-404-vflvCykRp.png";
     }
     elseif ($response->code != 200) {
-      throw new MediaInternetValidationException("The YouTube video ID is invalid or the video was deleted.");
+      throw new Exception("The YouTube video ID is invalid or the video was deleted.");
     }
     else {
-      $uri = file_stream_wrapper_uri_normalize('youtube://v/' . check_plain($parts['v']));
-      $external_url = file_create_url($uri);
-      $oembed_url = url('https://www.youtube.com/oembed', array('query' => array('url' => $external_url, 'format' => 'json')));
-      $response = drupal_http_request($oembed_url);
-
-      if (!isset($response->error)) {
-        $data = drupal_json_decode($response->data);
-        return $data['thumbnail_url'];
-      }
-      else {
-        throw new Exception("Error Processing Request. (Error: {$response->code}, {$response->error})");
-        return;
-      }
+      $data = $this->getOEmbed();
+      return $data['thumbnail_url'];
     }
   }
 

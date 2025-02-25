@@ -8,7 +8,6 @@ function file_remote_video_autoload_info() {
     'FileYouTubeStreamWrapper' => 'includes/FileYouTubeStreamWrapper.php',
     'FileVimeoStreamWrapper' => 'includes/FileVimeoStreamWrapper.php',
     'MediaReadOnlyStreamWrapper' => 'includes/MediaReadOnlyStreamWrapper.php',
-    'MediaReadOnlyStreamWrapper' => 'includes/MediaReadOnlyStreamWrapper.php',
     'FileRemoteVideoBaseHandler' => 'includes/FileRemoteVideoBaseHandler.inc',
     'FileRemoteVideoYouTubeHandler' => 'includes/FileRemoteVideoYouTubeHandler.inc',
     'FileRemoteVideoVimeoHandler' => 'includes/FileRemoteVideoVimeoHandler.inc',
@@ -84,6 +83,110 @@ function file_remote_video_get_remote_video_handlers() {
   return $handlers;
 }
 
+function file_remote_video_form_file_manage_form_alter(&$form, &$form_state) {
+  if (isset($form_state['file'])) {
+    $file = $form_state['file'];
+    if (file_remote_video_file_is_remote_video($file)) {
+      $form['file_remote_video'] = [
+        '#type' => 'fieldset',
+        '#title' => t('Remote Video'),
+        '#prefix' => '<div id="file-remote-video-ajax-wrapper">',
+        '#suffix' => '</div>',
+      ];
+      $form['file_remote_video']['messages'] = [
+        '#prefix' => '<div id="file-remote-video-messages">',
+        '#markup' => '',
+        '#suffix' => '</div>'
+      ];
+      $form['file_remote_video']['thumbnail'] = [
+        '#markup'=> theme('file_remote_video_form_thumbnail', ['file' => $file]),
+      ];
+      $form['file_remote_video']['fetch_metadata'] = [
+        '#type' => 'button',
+        '#value' => t('Fetch File Metadata'),
+        '#limit_validation_errors' => [],
+        '#ajax' => [
+          'callback' => 'file_remote_video_ajax_fetch_file_metadata',
+          'wrapper' => 'file-remote-video-ajax-wrapper',
+        ],
+      ];
+    }
+  }
+}
+
+/**
+ * Implements hook_entity_presave()
+ */
+function file_remote_video_entity_presave($entity, $type) {
+  if ($type == 'file') {
+    $file = $entity;
+    // On first save, try to save and fetch file metadata
+    if (empty($file->fid) && file_remote_video_file_is_remote_video($file)) {
+      file_remote_video_fetch_file_metadata($file);
+    }
+  }
+}
+
+function file_remote_video_ajax_fetch_file_metadata($form, $form_state) {
+  $file = $form_state['file'];
+  if (file_remote_video_file_is_remote_video($file)) {
+    $fetched = file_remote_video_fetch_file_metadata($file);
+    $saved = FALSE;
+    if ($fetched) {
+      $saved = $file->save();
+    }
+    if ($fetched && $saved) {
+      backdrop_set_message(t('Metadata saved successfully'));
+    }
+    else {
+      backdrop_set_error(t('Error saving metadata'));
+    }
+  }
+  $form['file_remote_video']['thumbnail'] = [
+    '#markup'=> theme('file_remote_video_form_thumbnail', ['file' => $file]),
+  ];
+  $form['file_remote_video']['messages']['#markup'] = theme('status_messages');
+  return $form['file_remote_video'];
+}
+
+function file_remote_video_fetch_file_metadata($file) {
+  if (!file_remote_video_file_is_remote_video($file)) {
+    backdrop_set_message(t('File is not a remote video'), 'error');
+    return;
+  }
+  $stream_wrapper = file_stream_wrapper_get_instance_by_uri($file->uri);
+  $success = FALSE;
+  try {
+    $data = $stream_wrapper->getOEmbed();
+    if (isset($data['thumbnail_url'])) {
+      if (!isset($file->metadata)) {
+        $file->metadata = [];
+      }
+      $file->metadata['thumbnail_url'] = $data['thumbnail_url'];
+      $file->metadata['thumbnail_width'] = $data['thumbnail_width'];
+      $file->metadata['thumbnail_height'] = $data['thumbnail_height'];
+      $success = TRUE;
+    }
+  }
+  catch (throwable $e) {
+    $success = FALSE;
+    $error_message = $e->getMessage();
+    backdrop_set_message($error_message, 'error');
+  }
+  return $success;
+}
+
+function file_remote_video_file_is_remote_video($file) {
+  $remote_stream_wrappers = file_remote_video_stream_wrappers();
+  $stream_wrapper_classes = [];
+  foreach ($remote_stream_wrappers as $wrapper) {
+   $stream_wrapper_classes[] = $wrapper['class'];
+  }
+  $stream_wrapper = file_stream_wrapper_get_instance_by_uri($file->uri);
+  $stream_wrapper_class = get_class($stream_wrapper);
+  return in_array($stream_wrapper_class, $stream_wrapper_classes);
+}
+
 /**
  * Implements hook_theme().
  */
@@ -105,6 +208,10 @@ function file_remote_video_theme($existing, $type, $theme, $path) {
       'path' => $path . '/themes',
       'template' => 'file-remote-video-vimeo',
     ),
+    'file_remote_video_form_thumbnail' => [
+      'variables' => ['file' => NULL],
+      'file' => 'file_remote_video.theme.inc',
+    ],
   );
 }
 
@@ -136,22 +243,6 @@ function file_remote_video_settings_form_submit($form, &$form_state) {
   backdrop_set_message(t('Configuration saved!'));
 }
 
-function file_remote_video_views_post_render(&$view, &$output, &$cache) {
-  if ($view->name == 'file_remote_video_library') {
-    $icon_path = backdrop_get_path('module', 'file_remote_video') . '/images/icon-video.svg';
-    $icon = theme('image', [
-      'path' => $icon_path,
-      'width' => 100,
-      'height' => 100,
-      'alt' => t('Video Icon'),
-    ]);
-    foreach ($view->result as $result) {
-      $placeholder = "--icon-{$result->fid}--";
-      $output = str_replace($placeholder, $icon, $output);
-    }
-  }
-}
-
 /**
  * Returns a file object which can be saved.
  *
@@ -176,4 +267,42 @@ function file_remote_video_load_or_create_video_by_uri($uri) {
     $file = new File($values);
   }
   return $file;
+
+}
+
+function file_remote_video_entity_property_info_alter(&$entity_info) {
+  $entity_info['file']['properties']['video_thumbnail'] = [
+    'label' => t('Video Thumbnail'),
+    'type' => 'text',
+    'computed' => TRUE,
+    'getter callback' => 'file_remote_video_file_get_video_thumbnail',
+    'entity views field' => TRUE,
+    'sanitized' => TRUE,
+  ];
+}
+
+function file_remote_video_file_get_video_thumbnail($file) {
+  $icon_path = backdrop_get_path('module', 'file_remote_video') . '/images/icon-video.svg';
+  $thumbnail = theme('image', [
+    'path' => $icon_path,
+    'width' => 100,
+    'height' => 100,
+    'alt' => t('Video Icon'),
+  ]);
+  if (file_remote_video_file_is_remote_video($file)) {
+    if (isset($file->metadata['thumbnail_url'])) {
+      $vars = [
+        'path' => $file->metadata['thumbnail_url'],
+        'alt' => $file->filename,
+      ];
+      if (isset($file->metadata['thumbnail_width'])) {
+        $vars['width'] = $file->metadata['thumbnail_width'];
+      }
+      if (isset($file->metadata['thumbnail_height'])) {
+        $vars['height'] = $file->metadata['thumbnail_height'];
+      }
+      $thumbnail = theme('image', $vars);
+    }
+  }
+  return $thumbnail;
 }

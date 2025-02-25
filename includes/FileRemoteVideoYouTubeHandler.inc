@@ -99,18 +99,21 @@ class FileRemoteVideoYouTubeHandler extends FileRemoteVideoBaseHandler {
    *   Otherwise, NULL.
    */
   public function getOEmbed() {
-    $uri = $this->parse($this->embedCode);
-    $external_url = file_create_url($uri);
-    $oembed_url = url('https://www.youtube.com/oembed', array('query' => array('url' => $external_url, 'format' => 'json')));
-    $response = drupal_http_request($oembed_url);
+    if (!isset($this->oembed)) {
+      $uri = $this->parse($this->embedCode);
+      $external_url = file_create_url($uri);
+      $oembed_url = url('https://www.youtube.com/oembed', array('query' => array('url' => $external_url, 'format' => 'json')));
+      $response = drupal_http_request($oembed_url);
 
-    if (!isset($response->error)) {
-      return drupal_json_decode($response->data);
+      if (!isset($response->error)) {
+        $this->oembed = drupal_json_decode($response->data);
+      }
+      else {
+        throw new Exception("Error Processing Request. (Error: {$response->code}, {$response->error})");
+        return;
+      }
     }
-    else {
-      throw new Exception("Error Processing Request. (Error: {$response->code}, {$response->error})");
-      return;
-    }
+    return $this->oembed;
   }
 
   /**

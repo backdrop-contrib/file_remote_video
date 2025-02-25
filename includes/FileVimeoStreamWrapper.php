@@ -22,21 +22,28 @@ class FileVimeoStreamWrapper extends MediaReadOnlyStreamWrapper {
     }
   }
 
-  function getOriginalThumbnailPath() {
-    $parts = $this->get_parameters();
-    $uri = file_stream_wrapper_uri_normalize('vimeo://v/' . check_plain($parts['v']));
-    $external_url = file_create_url($uri);
-    $oembed_url = url('http://vimeo.com/api/oembed.json', array('query' => array('url' => $external_url)));
-    $response = drupal_http_request($oembed_url);
+  public function getOEmbed() {
+    if (!isset($this->oembed)) {
+      $parts = $this->get_parameters();
+      $uri = file_stream_wrapper_uri_normalize('vimeo://v/' . check_plain($parts['v']));
+      $external_url = file_create_url($uri);
+      $oembed_url = url('http://vimeo.com/api/oembed.json', array('query' => array('url' => $external_url)));
+      $response = drupal_http_request($oembed_url);
 
-    if (!isset($response->error)) {
-      $data = drupal_json_decode($response->data);
-      return $data['thumbnail_url'];
+      if (!isset($response->error)) {
+        $this->oembed = drupal_json_decode($response->data);
+      }
+      else {
+        throw new Exception("Error Processing Request. (Error: {$response->code}, {$response->error})");
+        return;
+      }
     }
-    else {
-      throw new Exception("Error Processing Request. (Error: {$response->code}, {$response->error})");
-      return;
-    }
+    return $this->oembed;
+  }
+
+  function getOriginalThumbnailPath() {
+    $data = $this->getOEmbed();
+    return $data['thumbnail_url'];
   }
 
   function getLocalThumbnailPath() {
